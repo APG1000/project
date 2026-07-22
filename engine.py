@@ -11,16 +11,12 @@ MATE_SCORE = 10**6
 
 
 class ChessEngine:
-    def __init__(self, max_depth: int = 4, time_limit: Optional[float] = None) -> None:
+    def __init__(self, max_depth: int = 5, time_limit: Optional[float] = None) -> None:
         self.max_depth = max_depth
         self.time_limit = time_limit
 
-    def select_move(
-        self,
-        board: chess.Board,
-        max_depth: Optional[int] = None,
-        time_limit: Optional[float] = None,
-    ) -> Optional[chess.Move]:
+    def select_move(self, board: chess.Board, max_depth: Optional[float] = None, 
+                    time_limit: Optional[float] = None) -> Optional[chess.Move]:
         if board.is_game_over():
             return None
 
@@ -30,18 +26,19 @@ class ChessEngine:
         if len(legal_moves) == 1:
             return legal_moves[0]
 
+        # Determine search depth and time limit
         search_depth = self.max_depth if max_depth is None else max_depth
         search_depth = max(1, search_depth)
         time_limit = self.time_limit if time_limit is None else time_limit
         start_time = time.perf_counter() if time_limit is not None else None
 
+        # Best move has to be legal and return best score
         best_move = legal_moves[0]
         best_score = -INF
 
         for depth in range(1, search_depth + 1):
             if time_limit is not None and is_time_up(start_time, time_limit):
                 break
-
             try:
                 score, move = self._search_root(board, depth, start_time, time_limit)
             except TimeoutError:
@@ -51,18 +48,14 @@ class ChessEngine:
                 best_move = move
                 best_score = score
 
+            # If the best score is a checkmate score, we can stop searching deeper
             if abs(best_score) >= MATE_SCORE - depth:
                 break
 
         return best_move
 
-    def _search_root(
-        self,
-        board: chess.Board,
-        depth: int,
-        start_time: Optional[float],
-        time_limit: Optional[float],
-    ) -> Tuple[int, Optional[chess.Move]]:
+    def _search_root(self, board: chess.Board, depth: int, 
+                     start_time: Optional[float], time_limit: Optional[float]) -> Tuple[int, Optional[chess.Move]]:
         alpha = -INF
         beta = INF
         ordered_moves = self._order_moves(board, list(board.legal_moves))
@@ -74,11 +67,14 @@ class ChessEngine:
 
         for move in ordered_moves:
             if time_limit is not None and is_time_up(start_time, time_limit):
+                print(f"Search finished, elapsed: {time.perf_counter() - start_time:.2f}s")
                 raise TimeoutError
 
             board.push(move)
-            score = -self._negamax(board, depth - 1, -beta, -alpha, 1, start_time, time_limit)
-            board.pop()
+            try:
+                score = -self._negamax(board, depth - 1, -beta, -alpha, 1, start_time, time_limit)
+            finally:
+                board.pop()
 
             if score > best_score:
                 best_score = score
@@ -90,16 +86,8 @@ class ChessEngine:
 
         return best_score, best_move
 
-    def _negamax(
-        self,
-        board: chess.Board,
-        depth: int,
-        alpha: int,
-        beta: int,
-        ply: int,
-        start_time: Optional[float],
-        time_limit: Optional[float],
-    ) -> int:
+    def _negamax(self, board: chess.Board, depth: int, alpha: int, beta: int, ply: 
+                 int, start_time: Optional[float], time_limit: Optional[float]) -> int:
         if time_limit is not None and is_time_up(start_time, time_limit):
             raise TimeoutError
 
@@ -113,8 +101,10 @@ class ChessEngine:
         best_value = -INF
         for move in self._order_moves(board, list(board.legal_moves)):
             board.push(move)
-            value = -self._negamax(board, depth - 1, -beta, -alpha, ply + 1, start_time, time_limit)
-            board.pop()
+            try:
+                value = -self._negamax(board, depth - 1, -beta, -alpha, ply + 1, start_time, time_limit)
+            finally:
+                board.pop()
 
             best_value = max(best_value, value)
             alpha = max(alpha, value)
@@ -123,17 +113,12 @@ class ChessEngine:
 
         return best_value
 
+    # Order moves for better alpha-beta pruning efficiency: captures first, then quiet moves
     def _order_moves(self, board: chess.Board, moves: list[chess.Move]) -> list[chess.Move]:
         def move_sort_key(move: chess.Move) -> tuple[int, int, int]:
             captured_piece = board.piece_at(move.to_square)
             if captured_piece is not None:
                 return (0, -captured_piece.piece_type, move.to_square)
             return (1, 0, move.to_square)
-
+        # sort the tuples by the first element (capture status), then by the second element (piece type), and finally by the third element (to_square)
         return sorted(moves, key=move_sort_key)
-
-
-if __name__ == "__main__":
-    engine = ChessEngine(max_depth=2)
-    board = chess.Board()
-    print(format_move(engine.select_move(board)))
