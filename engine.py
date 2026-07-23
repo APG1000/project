@@ -28,7 +28,7 @@ class ChessEngine:
 
         # Determine search depth and time limit
         search_depth = self.max_depth if max_depth is None else max_depth
-        search_depth = max(1, search_depth)
+        search_depth = int(max(1, search_depth))
         time_limit = self.time_limit if time_limit is None else time_limit
         start_time = time.perf_counter() if time_limit is not None else None
 
@@ -67,7 +67,6 @@ class ChessEngine:
 
         for move in ordered_moves:
             if time_limit is not None and is_time_up(start_time, time_limit):
-                print(f"Search finished, elapsed: {time.perf_counter() - start_time:.2f}s")
                 raise TimeoutError
 
             board.push(move)
