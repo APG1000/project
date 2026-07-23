@@ -11,7 +11,6 @@ def main() -> None:
 
     print("Welcome to the Chess Engine! Do you want to play as White or Black? (W/B)")
     player_color = input().strip().upper()
-    
 
     print("Chess engine ready. Enter moves in SAN or UCI format, or type 'quit'.")
     print(board)
